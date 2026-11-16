@@ -36,6 +36,16 @@ CREATE TABLE IF NOT EXISTS handover_items (
   batch_id INTEGER NOT NULL REFERENCES batches(id),
   PRIMARY KEY (handover_id, batch_id)
 );
+-- 签注与清单隔离：独立签注表按交班单 id 关联双方签名与所签摘要
+CREATE TABLE IF NOT EXISTS handover_attestations (
+  handover_id INTEGER NOT NULL REFERENCES handovers(id),
+  party TEXT NOT NULL CHECK (party IN ('from', 'to')),
+  shift_id INTEGER NOT NULL REFERENCES shifts(id),
+  digest TEXT NOT NULL,
+  signature TEXT NOT NULL,
+  signed_at TEXT NOT NULL,
+  PRIMARY KEY (handover_id, party)
+);
 CREATE TABLE IF NOT EXISTS reconcile_reports (
   id INTEGER PRIMARY KEY,
   handover_id INTEGER REFERENCES handovers(id),
@@ -49,11 +59,46 @@ CREATE TABLE IF NOT EXISTS reconcile_reports (
 """
 
 
+def _ensure_column(conn, table: str, column: str, ddl: str) -> None:
+    cols = [r["name"] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+    if column not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {ddl}")
+
+
+def _migrate(conn) -> None:
+    # 清单摘要列：发起时固化的键有序哈希，完成时与签注摘要比对
+    _ensure_column(conn, "handovers", "manifest_digest", "manifest_digest TEXT NOT NULL DEFAULT ''")
+    # 升级前遗留的进行中交班单：按当前清单回填摘要（已完成历史单保持空值）
+    from app import keys
+
+    rows = conn.execute(
+        "SELECT id FROM handovers WHERE status = '进行中' AND manifest_digest = ''"
+    ).fetchall()
+    for row in rows:
+        biz_keys = [
+            r["biz_key"]
+            for r in conn.execute(
+                """
+                SELECT b.biz_key FROM handover_items hi
+                JOIN batches b ON b.id = hi.batch_id
+                WHERE hi.handover_id = ?
+                """,
+                (row["id"],),
+            ).fetchall()
+        ]
+        conn.execute(
+            "UPDATE handovers SET manifest_digest = ? WHERE id = ?",
+            (keys.manifest_digest(biz_keys), row["id"]),
+        )
+
+
 def init_db() -> None:
     with connect() as conn:
         conn.executescript(SCHEMA)
+        _migrate(conn)
         n = conn.execute("SELECT COUNT(*) AS c FROM shifts").fetchone()["c"]
         if n:
+            conn.commit()
             return
         seed_path = FIXTURES_DIR / "seed.json"
         data = json.loads(Path(seed_path).read_text(encoding="utf-8"))

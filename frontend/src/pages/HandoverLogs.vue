@@ -17,12 +17,12 @@ onMounted(async () => {
 <template>
   <div>
     <h1>交班记录</h1>
-    <p class="lead">每单交班留档：双方班次、清单批次数、最终状态。</p>
+    <p class="lead">每单交班留档：双方班次、清单批次数、清单摘要、双方签注与最终状态，可回溯核对。</p>
     <p v-if="err" class="msg">{{ err }}</p>
     <div class="panel">
       <table>
         <thead>
-          <tr><th>单号</th><th>交班方</th><th>接班方</th><th>批次数</th><th>状态</th><th>开始</th><th>结束</th></tr>
+          <tr><th>单号</th><th>交班方</th><th>接班方</th><th>批次数</th><th>清单摘要</th><th>签注</th><th>状态</th><th>开始</th><th>结束</th></tr>
         </thead>
         <tbody>
           <tr v-for="h in rows" :key="h.id">
@@ -30,6 +30,8 @@ onMounted(async () => {
             <td>{{ h.from_shift_name }}</td>
             <td>{{ h.to_shift_name }}</td>
             <td>{{ h.batch_count }}</td>
+            <td>{{ h.manifest_digest ? h.manifest_digest.slice(0, 12) + '…' : '—' }}</td>
+            <td>{{ h.attest_count != null ? h.attest_count + '/2' : '—' }}</td>
             <td>{{ h.status }}</td>
             <td>{{ h.started_at }}</td>
             <td>{{ h.finished_at || '—' }}</td>

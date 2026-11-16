@@ -1,0 +1,9 @@
+{
+  "scheme": "hmac-sha256",
+  "note": "本地夹具密钥，仅用于本地签注演示与测试，严禁接入外网证书服务",
+  "shifts": [
+    {"shift_id": 1, "key_id": "fixture-key-shift-1", "secret": "shiftboard-local-fixture-key-shift-1"},
+    {"shift_id": 2, "key_id": "fixture-key-shift-2", "secret": "shiftboard-local-fixture-key-shift-2"},
+    {"shift_id": 3, "key_id": "fixture-key-shift-3", "secret": "shiftboard-local-fixture-key-shift-3"}
+  ]
+}
